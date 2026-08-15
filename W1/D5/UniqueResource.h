@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <utility>
 
 template<typename Resource, typename Deleter>
 class UniqueResource {
@@ -8,6 +9,22 @@ public:
         if (resource_) deleter_(resource_); 
     }
     
+    UniqueResource(Resource&& resource) noexcept :
+        resource_(resource.resource_), 
+        deleter_(std::move(resource.deleter_)) {
+            resource.resouce_ = {};
+    }
+
+    Resource& operator=(Resource&& resource) noexcept {
+        if (&resource != this){
+            if (resource_) { deleter_(resource_); }
+            resource_ = resource.resource_;
+            deleter_ = std::move(resource.deleter_);
+            resource.resource_ = Resource{};
+        }
+        return *this;
+    }
+
     UniqueResource(const Resource& resource) = delete;
     Resource& operator=(const Resource& resource) = delete;
 
