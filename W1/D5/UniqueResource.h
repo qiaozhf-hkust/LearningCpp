@@ -31,7 +31,7 @@ public:
     Resource get() const noexcept { return resource_; }
 private:
     Resource resource_;
-    Deleter deleter_;
+    [[no_unique_address]] Deleter deleter_;
 };
 
 struct file_closer {
