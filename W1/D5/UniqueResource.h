@@ -42,6 +42,7 @@ struct file_closer {
     }
 };
 
+// 创建别名方便使用
 using FileHandler = UniqueResource<FILE*, file_closer>;
 
 FileHandler open(const char* path, const char* mode){
