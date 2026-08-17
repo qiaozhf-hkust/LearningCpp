@@ -1,7 +1,23 @@
 #include <cstdio>
+#include <unistd.h>
 #include <utility>
 
-template<typename Resource, typename Deleter>
+template<typename T>
+struct default_resource_traits {
+    static constexpr T invalid_value() noexcept { return T{}; }
+};
+
+struct fd_traits {
+    static constexpr int invalid_value() noexcept { return -1; }
+};
+
+struct fd_closer {
+    void operator()(int fd) const noexcept  {
+        if (fd >= 0) ::close(fd);
+    }
+};
+
+template<typename Resource, typename Deleter, typename Traits = default_resource_traits<Resource>>
 class UniqueResource {
 public:
     explicit UniqueResource(Resource resource, Deleter deleter) noexcept : resource_(resource), deleter_(deleter) {}
@@ -16,10 +32,9 @@ public:
     }
 
     Resource& operator=(Resource&& resource) noexcept {
-
         if (&resource != this){
             reset(resource.release());
-            resource.resource_ = Resource{};
+            deleter_ = std::move(resource.deleter_);
         }
         return *this;
     }
@@ -31,12 +46,15 @@ public:
 
     Resource release() noexcept {
         Resource tmp = resource_;
-        resource_ = Resource{};
+        resource_ = Traits::invalid_value();
         return tmp;
     }
 
     void reset() noexcept {
-        if (resource_) deleter_(resource_); 
+        if (resource_ != Traits::invalid_value()) {
+            deleter_(resource_);
+            resource_ = Traits::invalid_value();
+        }
     }
 
     void reset(Resource r) {
@@ -45,11 +63,11 @@ public:
     }
 
     explicit operator bool() const noexcept {
-        return static_cast<bool>(resource_);
+        return resource_ != Traits::invalid_value();
     } 
 
-    Deleter& getDeleter() noexcept { return deleter_; }
-    const Deleter& getDeleter() const noexcept { return deleter_; }
+    Deleter& get_deleter() noexcept { return deleter_; }
+    const Deleter& get_deleter() const noexcept { return deleter_; }
 
     friend void swap(UniqueResource& a, UniqueResource& b){
         using std::swap;
