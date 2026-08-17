@@ -6,7 +6,7 @@ class UniqueResource {
 public:
     explicit UniqueResource(Resource resource, Deleter deleter) noexcept : resource_(resource), deleter_(deleter) {}
     ~UniqueResource() { 
-        if (resource_) deleter_(resource_); 
+        reset();
     }
     
     UniqueResource(Resource&& resource) noexcept :
@@ -16,10 +16,9 @@ public:
     }
 
     Resource& operator=(Resource&& resource) noexcept {
+
         if (&resource != this){
-            if (resource_) { deleter_(resource_); }
-            resource_ = resource.resource_;
-            deleter_ = std::move(resource.deleter_);
+            reset(resource.release());
             resource.resource_ = Resource{};
         }
         return *this;
@@ -29,6 +28,35 @@ public:
     Resource& operator=(const Resource& resource) = delete;
 
     Resource get() const noexcept { return resource_; }
+
+    Resource release() noexcept {
+        Resource tmp = resource_;
+        resource_ = Resource{};
+        return tmp;
+    }
+
+    void reset() noexcept {
+        if (resource_) deleter_(resource_); 
+    }
+
+    void reset(Resource r) {
+        reset();
+        resource_ = r;
+    }
+
+    explicit operator bool() const noexcept {
+        return static_cast<bool>(resource_);
+    } 
+
+    Deleter& getDeleter() noexcept { return deleter_; }
+    const Deleter& getDeleter() const noexcept { return deleter_; }
+
+    friend void swap(UniqueResource& a, UniqueResource& b){
+        using std::swap;
+        swap(a.resource_, b.resource_);
+        swap(a.deleter_, b.deleter_);
+    }
+
 private:
     Resource resource_;
     [[no_unique_address]] Deleter deleter_;
